@@ -1,11 +1,7 @@
 import { useState } from 'react';
-import {
-    parseGitHubUrl,
-    fetchFileContent
-} from '../utils/github';
-import { getCodeFeedback } from '../utils/huggingface';
+import { parseGitHubUrl, fetchFileContent } from '../utils/github';
+import { getCodeFeedback } from '../utils/ollama';
 import FolderTree from './FolderTree';
-
 
 const Form = () => {
     const [repoUrl, setRepoUrl] = useState('');
@@ -49,9 +45,7 @@ const Form = () => {
             }
 
             const combinedCode = Object.values(fileContents).join('\n\n');
-
             const aiResponse = await getCodeFeedback(combinedCode, challenge);
-
             setFeedback(aiResponse);
         } catch (err) {
             console.error(err);
@@ -61,16 +55,39 @@ const Form = () => {
         setLoading(false);
     };
 
+    const handleCopyAll = async () => {
+        try {
+            const fileContents = {};
+            for (const file of selectedFiles) {
+                fileContents[file] = await fetchFileContent(
+                    ownerRepo.owner,
+                    ownerRepo.repo,
+                    file
+                );
+            }
+
+            const combinedCode = Object.entries(fileContents)
+                .map(([file, content]) => `// File: ${file}\n${content}`)
+                .join('\n\n');
+
+            await navigator.clipboard.writeText(combinedCode);
+            alert('Code copied to clipboard!');
+        } catch (err) {
+            console.error(err);
+            alert('Failed to copy code.');
+        }
+    };
+
     return (
         <form
             onSubmit={handleSubmit}
-            className=" xl:w-2xl lg:w-xl md:w-lg bg-blue-800 p-6 rounded-2xl shadow space-y-6"
+            className="xl:w-2xl lg:w-xl md:w-lg bg-blue-800 p-6 rounded-2xl shadow space-y-6"
         >
-            <h2 className="text-2xl font-bold text-center">AI Frontend Reviewer</h2>
+            <h2 className="text-2xl font-bold text-center text-white">AI Frontend Reviewer</h2>
 
             {/* GitHub Input */}
             <div>
-                <label className="block font-medium mb-1">GitHub Repo URL:</label>
+                <label className="block font-medium mb-1 text-white">GitHub Repo URL:</label>
                 <div className="flex gap-2 sm:flex-row flex-col">
                     <input
                         type="url"
@@ -93,8 +110,8 @@ const Form = () => {
             {/* Folder Tree */}
             {ownerRepo && (
                 <div>
-                    <label className="block font-medium mb-2">Select files:</label>
-                    <div className="max-h-64 overflow-auto border p-2 rounded ">
+                    <label className="block font-medium mb-2 text-white">Select files:</label>
+                    <div className="max-h-64 overflow-auto border p-2 rounded">
                         <FolderTree
                             owner={ownerRepo.owner}
                             repo={ownerRepo.repo}
@@ -105,11 +122,20 @@ const Form = () => {
                 </div>
             )}
 
-            {/* Selected files list */}
+            {/* Selected files list and Copy button */}
             {selectedFiles.length > 0 && (
-                <div className=" p-2 rounded text-sm">
-                    <p className="font-semibold">Selected files:</p>
-                    <ul className="list-disc pl-5">
+                <div className="p-2 rounded text-sm text-white">
+                    <div className="flex items-center justify-between">
+                        <p className="font-semibold">Selected files:</p>
+                        <button
+                            type="button"
+                            onClick={handleCopyAll}
+                            className="bg-gray-700 text-white px-3 py-1 text-sm rounded hover:bg-gray-800"
+                        >
+                            Copy All Code
+                        </button>
+                    </div>
+                    <ul className="list-disc pl-5 mt-2">
                         {selectedFiles.map((file) => (
                             <li key={file}>{file}</li>
                         ))}
@@ -119,7 +145,9 @@ const Form = () => {
 
             {/* Challenge input */}
             <div>
-                <label className="block font-medium mb-1">What challenge did you face?</label>
+                <label className="block font-medium mb-1 text-white">
+                    What challenge did you face?
+                </label>
                 <textarea
                     value={challenge}
                     onChange={(e) => setChallenge(e.target.value)}
@@ -129,8 +157,10 @@ const Form = () => {
             </div>
 
             {/* Screenshot upload */}
-            <div className='flex items-center flex-wrap space-x-3'>
-                <label className="block font-medium mb-1 text-white">Screenshot (optional):</label>
+            <div className="flex items-center flex-wrap space-x-3">
+                <label className="block font-medium mb-1 text-white">
+                    Screenshot (optional):
+                </label>
                 <div className="overflow-hidden w-full max-w-[215px]">
                     <input
                         type="file"
@@ -140,7 +170,6 @@ const Form = () => {
                     />
                 </div>
             </div>
-
 
             {/* Submit button */}
             <button
@@ -155,7 +184,7 @@ const Form = () => {
             {feedback && (
                 <div className="mt-6 p-4 rounded border">
                     <h3 className="font-semibold mb-2">AI Feedback:</h3>
-                    <pre className="whitespace-pre-wrap">{feedback}</pre>
+                    <pre className="whitespace-pre-wrap text-black">{feedback}</pre>
                 </div>
             )}
         </form>
