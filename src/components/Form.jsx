@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { parseGitHubUrl, fetchFileContent } from '../utils/github';
 import { getCodeFeedback } from '../utils/ollama';
 import FolderTree from './FolderTree';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 
 const Form = () => {
     const [repoUrl, setRepoUrl] = useState('');
@@ -11,13 +13,21 @@ const Form = () => {
     const [screenshot, setScreenshot] = useState(null);
     const [feedback, setFeedback] = useState('');
     const [loading, setLoading] = useState(false);
+    const [repoLoading, setRepoLoading] = useState(false);
 
-    const handleRepoFetch = () => {
+    const handleRepoFetch = async () => {
         try {
+            setRepoLoading(true);
+            setSelectedFiles([]);
+            setOwnerRepo(null); // Clear old data
             const { owner, repo } = parseGitHubUrl(repoUrl);
+            // Simulate delay so loader is visible (remove in production)
+            await new Promise((res) => setTimeout(res, 300));
             setOwnerRepo({ owner, repo });
         } catch {
             alert('Invalid GitHub URL');
+        } finally {
+            setRepoLoading(false);
         }
     };
 
@@ -79,115 +89,157 @@ const Form = () => {
     };
 
     return (
-        <form
+        <motion.form
             onSubmit={handleSubmit}
-            className="xl:w-2xl lg:w-xl md:w-lg bg-blue-800 p-6 rounded-2xl shadow space-y-6"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="max-w-3xl w-full mx-auto bg-white p-8 rounded-3xl shadow-2xl space-y-8 border border-gray-200"
         >
-            <h2 className="text-2xl font-bold text-center text-white">AI Frontend Reviewer</h2>
+            <h2 className="text-3xl font-bold text-center text-gray-800">🚀 AI Frontend Reviewer</h2>
 
             {/* GitHub Input */}
-            <div>
-                <label className="block font-medium mb-1 text-white">GitHub Repo URL:</label>
-                <div className="flex gap-2 sm:flex-row flex-col">
+            <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">GitHub Repo URL:</label>
+                <div className="flex flex-col sm:flex-row gap-3">
                     <input
                         type="url"
                         value={repoUrl}
                         onChange={(e) => setRepoUrl(e.target.value)}
                         placeholder="https://github.com/user/repo"
-                        className="flex-1 px-3 py-2 border rounded"
+                        className="flex-1 px-4 py-2 rounded-lg border border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 text-gray-800 placeholder-gray-400"
                         required
                     />
-                    <button
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.97 }}
                         type="button"
                         onClick={handleRepoFetch}
-                        className="bg-blue-600 text-white px-4 rounded hover:bg-blue-700"
+                        disabled={repoLoading}
+                        className="px-4 py-2 bg-black text-white rounded-lg transition-all shadow flex items-center gap-2"
                     >
-                        Load Repo
-                    </button>
+                        {repoLoading ? (
+                            <>
+                                <Loader2 className="animate-spin w-4 h-4" />
+                                Loading...
+                            </>
+                        ) : (
+                            'Load Repo'
+                        )}
+                    </motion.button>
                 </div>
             </div>
 
             {/* Folder Tree */}
-            {ownerRepo && (
-                <div>
-                    <label className="block font-medium mb-2 text-white">Select files:</label>
-                    <div className="max-h-64 overflow-auto border p-2 rounded">
-                        <FolderTree
-                            owner={ownerRepo.owner}
-                            repo={ownerRepo.repo}
-                            onFileToggle={toggleFile}
-                            selectedFiles={selectedFiles}
-                        />
-                    </div>
-                </div>
-            )}
+            <AnimatePresence>
+                {ownerRepo && !repoLoading && (
+                    <motion.div
+                        key={`${ownerRepo.owner}/${ownerRepo.repo}`}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.4 }}
+                        className="overflow-hidden"
+                    >
+                        <label className="text-sm font-medium text-gray-700">Select files:</label>
+                        <div className="max-h-64 overflow-auto border border-gray-200 bg-gray-50 p-3 rounded-xl mt-2 shadow-inner">
+                            <FolderTree
+                                key={`${ownerRepo.owner}/${ownerRepo.repo}`}
+                                owner={ownerRepo.owner}
+                                repo={ownerRepo.repo}
+                                onFileToggle={toggleFile}
+                                selectedFiles={selectedFiles}
+                                fileIcon="📘"
+                                fileTextColor="text-blue-700"
+                            />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-            {/* Selected files list and Copy button */}
-            {selectedFiles.length > 0 && (
-                <div className="p-2 rounded text-sm text-white">
-                    <div className="flex items-center justify-between">
-                        <p className="font-semibold">Selected files:</p>
-                        <button
-                            type="button"
-                            onClick={handleCopyAll}
-                            className="bg-gray-700 text-white px-3 py-1 text-sm rounded hover:bg-gray-800"
-                        >
-                            Copy All Code
-                        </button>
-                    </div>
-                    <ul className="list-disc pl-5 mt-2">
-                        {selectedFiles.map((file) => (
-                            <li key={file}>{file}</li>
-                        ))}
-                    </ul>
-                </div>
-            )}
+            {/* Selected Files */}
+            <AnimatePresence>
+                {selectedFiles.length > 0 && (
+                    <motion.div
+                        key="selected-files"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        transition={{ duration: 0.3 }}
+                        className="bg-gray-100 p-4 rounded-lg shadow-inner space-y-2"
+                    >
+                        <div className="flex justify-between items-center">
+                            <p className="text-sm font-medium text-gray-700">✅ Selected Files:</p>
+                            <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.97 }}
+                                type="button"
+                                onClick={handleCopyAll}
+                                className="text-sm px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900 transition"
+                            >
+                                Copy All Code
+                            </motion.button>
+                        </div>
+                        <ul className="list-disc pl-5 text-gray-600 text-sm space-y-1">
+                            {selectedFiles.map((file) => (
+                                <li key={file}>{file}</li>
+                            ))}
+                        </ul>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-            {/* Challenge input */}
+            {/* Challenge Textarea */}
             <div>
-                <label className="block font-medium mb-1 text-white">
-                    What challenge did you face?
-                </label>
+                <label className="text-sm font-medium text-gray-700">🧠 What challenge did you face?</label>
                 <textarea
                     value={challenge}
                     onChange={(e) => setChallenge(e.target.value)}
-                    className="w-full px-3 py-2 border rounded"
-                    rows={3}
+                    rows={4}
+                    placeholder="Describe your challenge..."
+                    className="w-full px-4 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-gray-800 placeholder-gray-400"
                 />
             </div>
 
-            {/* Screenshot upload */}
-            <div className="flex items-center flex-wrap space-x-3">
-                <label className="block font-medium mb-1 text-white">
-                    Screenshot (optional):
-                </label>
-                <div className="overflow-hidden w-full max-w-[215px]">
-                    <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setScreenshot(e.target.files[0])}
-                        className="block cursor-pointer w-full text-sm text-white file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
-                    />
-                </div>
+            {/* Screenshot Upload */}
+            <div>
+                <label className="text-sm font-medium text-gray-700">📷 Upload Screenshot (optional):</label>
+                <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setScreenshot(e.target.files[0])}
+                    className="block w-full text-sm text-gray-800 mt-1 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-semibold file:bg-black file:text-white  transition"
+                />
             </div>
 
-            {/* Submit button */}
-            <button
+            {/* Submit */}
+            <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
                 type="submit"
                 disabled={loading}
-                className="bg-green-600 text-white px-5 py-2 rounded hover:bg-green-700 w-full"
+                className="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition"
             >
                 {loading ? 'Analyzing...' : 'Get AI Feedback'}
-            </button>
+            </motion.button>
 
-            {/* Feedback result */}
-            {feedback && (
-                <div className="mt-6 p-4 rounded border">
-                    <h3 className="font-semibold mb-2">AI Feedback:</h3>
-                    <pre className="whitespace-pre-wrap text-black">{feedback}</pre>
-                </div>
-            )}
-        </form>
+            {/* Feedback */}
+            <AnimatePresence>
+                {feedback && (
+                    <motion.div
+                        key="feedback"
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 30 }}
+                        transition={{ duration: 0.4 }}
+                        className="mt-6 bg-gray-50 border border-gray-200 p-4 rounded-lg"
+                    >
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">🧾 AI Feedback:</h3>
+                        <pre className="whitespace-pre-wrap text-gray-800 text-sm font-mono">{feedback}</pre>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </motion.form>
     );
 };
 
